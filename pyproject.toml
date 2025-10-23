@@ -1,0 +1,17 @@
+[project]
+name = "andreas-work"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "azure-identity>=1.25.1",
+    "dash>=3.2.0",
+    "dash-bootstrap-components>=2.0.4",
+    "dotenv>=0.9.9",
+    "msal>=1.34.0",
+    "numpy>=2.3.4",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.3",
+    "requests>=2.32.5",
+]
