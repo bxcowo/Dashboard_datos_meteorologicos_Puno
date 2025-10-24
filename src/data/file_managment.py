@@ -74,7 +74,7 @@ def get_registro_mensual(folder_path, year, month, access_token):
     Obtener un Dataframe de los datos mensuales de todas las estaciones
     """
 
-    name_month = convert_month(month)
+    name_month = convert_month(month - 1)
     if month < 10:
         month = digit_to_string(month)
 
@@ -89,6 +89,7 @@ def get_registro_mensual(folder_path, year, month, access_token):
         content = BytesIO(response.content)
         df = pd.read_excel(
             content,
+            sheet_name="METEO",
             skiprows=4,
             usecols='B:FU',
             nrows=33
