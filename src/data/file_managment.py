@@ -44,7 +44,7 @@ def get_registro_diario(folder_path, year, month, day, access_token):
     headers = {"Authorization" : f"Bearer {access_token}"}
     month = convert_month(month - 1)
     if day < 10:
-        day = digit_to_string(day)
+        day = digit_to_string(day - 1)
 
     full_path = f"{folder_path}/{year}/{month}/SENAMHI_DZ13_Datos_{day}_{month}_{year}.xlsx"
     encoded_path = quote(full_path, safe='/')
@@ -76,7 +76,7 @@ def get_registro_mensual(folder_path, year, month, access_token):
 
     name_month = convert_month(month - 1)
     if month < 10:
-        month = digit_to_string(month)
+        month = digit_to_string(month - 1)
 
     full_path = f"{folder_path}/{year}/{month}. {name_month} {year}.xlsx"
     encoded_path = quote(full_path, safe='/')
