@@ -140,13 +140,14 @@ def create_graph(variable, fecha):
         tickangle=-45,
         showgrid=True,
         gridwidth=1,
-        gridcolor='gray'
+        gridcolor='lightgray'
     )
 
     fig.update_yaxes(
         showgrid=True,
         gridwidth=1,
-        gridcolor='gray'
+        dtick=1,
+        gridcolor='lightgray'
     )
 
     return fig
