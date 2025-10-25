@@ -1,38 +1,16 @@
-"""
-Dashboard de Datos Meteorológicos - Puno
-Aplicación multi-página con análisis diario y semanal
-"""
-import os
-import sys
-from dash import Dash, html, Input, Output
-import dash_mantine_components as dmc
-from dash_iconify import DashIconify
-
-# Agregar el directorio src al path para imports relativos
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from cache import init_cache
+from dash import Dash, html, Input, Output, callback
 from ui.control_diario import registro_diario_layout
 from ui.control_semanal import control_semanal_layout
-
-
-def load_env_vars(env_file=".env"):
-    """Carga las variables de entorno desde el archivo '.env'"""
-    env_vars = {}
-    if os.path.exists(env_file):
-        with open(env_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    key, value = line.split('=', 1)
-                    env_vars[key] = value.strip('"').strip("'")
-    else:
-        raise FileNotFoundError(f"Archivo {env_file} no encontrado")
-    return env_vars
-
+from dash_iconify import DashIconify
+from config import CLIENT_ID
+from cache import init_cache
+import dash_mantine_components as dmc
 
 def create_navbar():
-    """Crea la barra de navegación para cambiar entre páginas"""
+    """
+    Crea la barra de navegación para cambiar entre páginas
+    """
+
     return dmc.Paper(p="md", shadow="lg", radius="md", mb="md", children=[
         dmc.Group(justify="space-between", children=[
             dmc.Group(gap="md", children=[
@@ -67,7 +45,10 @@ def create_navbar():
 
 
 def create_multi_page_app():
-    """Crea la aplicación Dash multi-página"""
+    """
+    Crea la aplicación Dash multi-página
+    """
+
     app = Dash(__name__, suppress_callback_exceptions=True)
 
     app.layout = dmc.MantineProvider(
@@ -81,7 +62,7 @@ def create_multi_page_app():
     )
 
     # Callback para cambiar entre páginas
-    @app.callback(
+    @callback(
         Output("page-content", "children"),
         Input("page-selector", "value")
     )
@@ -96,33 +77,29 @@ def create_multi_page_app():
 
 
 def main():
-    """Flujo principal de la aplicación"""
+    """
+    Flujo principal de la aplicación
+    """
+
     print("=== Dashboard de Datos Meteorológicos Puno ===\n")
 
-    # 1. Cargar variables de entorno
-    print("1. Cargando variables de entorno...")
-    env_vars = load_env_vars(".env")
-    client_id = env_vars.get("CLIENT_ID")
-
-    if not client_id:
+    if not CLIENT_ID:
         raise ValueError("CLIENT_ID no encontrado en archivo .env")
 
-    print(f"    CLIENT_ID: {client_id[:8]}...")
-    print("    ✓ Variables cargadas\n")
-
-    # 2. Inicializar cache (autenticación + datos normales)
-    print("2. Inicializando cache (autenticación y datos normales)...")
+    # 1. Inicializar cache (autenticación + datos normales)
+    print("1. Inicializando cache (autenticación y datos normales)...")
     init_cache()
-    print("    ✓ Cache inicializado\n")
+    print("    Cache inicializado\n")
 
-    # 3. Crear y ejecutar app multi-página
-    print("3. Creando aplicación multi-página...")
+    # 2. Crear y ejecutar app multi-página
+    print("2. Creando aplicación multi-página...")
     app = create_multi_page_app()
-    print("    ✓ Aplicación creada\n")
+    print("    Aplicación creada\n")
 
-    print("🚀 Abriendo dashboard en http://127.0.0.1:8050")
-    print("   📊 Análisis Diario: Vista por zonas de Puno")
-    print("   📈 Análisis Semanal: Comparación entre estaciones")
+    # 3. Ejecutando el dashboard
+    print("3. Abriendo dashboard en http://127.0.0.1:8050")
+    print("   Análisis Diario: Vista por zonas de Puno")
+    print("   Análisis Semanal: Comparación entre estaciones")
     print("   Presiona Ctrl+C para detener el servidor\n")
 
     app.run(debug=True, host='127.0.0.1', port=8050)
@@ -132,5 +109,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n Error: {e}")
         raise
