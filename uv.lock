@@ -9,7 +9,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "azure-identity" },
     { name = "dash" },
-    { name = "dash-bootstrap-components" },
+    { name = "dash-mantine-components" },
     { name = "dotenv" },
     { name = "msal" },
     { name = "numpy" },
@@ -22,7 +22,7 @@ dependencies = [
 requires-dist = [
     { name = "azure-identity", specifier = ">=1.25.1" },
     { name = "dash", specifier = ">=3.2.0" },
-    { name = "dash-bootstrap-components", specifier = ">=2.0.4" },
+    { name = "dash-mantine-components", specifier = ">=2.3.0" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "msal", specifier = ">=1.34.0" },
     { name = "numpy", specifier = ">=2.3.4" },
@@ -290,15 +290,15 @@ wheels = [
 ]
 
 [[package]]
-name = "dash-bootstrap-components"
-version = "2.0.4"
+name = "dash-mantine-components"
+version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cc/d4/5b7da808ff5acb3a6ca702f504d8ef05bc7d4c475b18dadefd783b1120c3/dash_bootstrap_components-2.0.4.tar.gz", hash = "sha256:c3206c0923774bbc6a6ddaa7822b8d9aa5326b0d3c1e7cd795cc975025fe2484", size = 115599 }
+sdist = { url = "https://files.pythonhosted.org/packages/fb/24/1226bc3519c73b3a4593ee971a475ff585096ce2f560c7b6e1af579f836a/dash_mantine_components-2.3.0.tar.gz", hash = "sha256:7400b75b1ca4e8b1bc8d8d1e07e5312c82770104791f0b8d12a832565e9eb628", size = 891913 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/38/1efeec8b4d741c09ccd169baf8a00c07a0176b58e418d4cd0c30dffedd22/dash_bootstrap_components-2.0.4-py3-none-any.whl", hash = "sha256:767cf0084586c1b2b614ccf50f79fe4525fdbbf8e3a161ed60016e584a14f5d1", size = 204044 },
+    { url = "https://files.pythonhosted.org/packages/3f/4d/28dacb699e4de8d36c0cdead85e9267401551a94ba7e38ea39fc57ef7814/dash_mantine_components-2.3.0-py3-none-any.whl", hash = "sha256:5e4995877bce9ee856002364d0975f924601511887263a12fd5aaa7d9f444cd5", size = 1322745 },
 ]
 
 [[package]]
