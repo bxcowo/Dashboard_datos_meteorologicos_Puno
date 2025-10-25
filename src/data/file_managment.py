@@ -33,6 +33,7 @@ def get_all_normales():
             df = df[df["DEPARTAMENTO"] == "PUNO"]
             df = df.drop("DEPARTAMENTO", axis=1)
             df = df.set_index('NOMBRE ESTACION', drop=True)
+            df.columns = df.columns.str.upper()
             normales[sheet] = df
 
         return normales
