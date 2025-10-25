@@ -1,16 +1,19 @@
 from urllib.parse import quote
 from io import BytesIO
+from cache import data_cache
+import config as cf
 import pandas as pd
 import requests
+import calendar
 
-def get_all_normales(folder_path, filename, access_token):
+def get_all_normales():
     """
     Obtener lista de Dataframes de valores normales para cada estación por mes
     """
 
-    headers = {"Authorization" : f"Bearer {access_token}"}
+    headers = {"Authorization" : f"Bearer {data_cache["ACCESS_TOKEN"]}"}
 
-    full_path = f"{folder_path}/{filename}"
+    full_path = f"{cf.DIRECTORIO_PRINCIPAL}/{cf.DIRECTORIO_REGISTRO_NORMAL}/{cf.ARCHIVO_EXCEL_NORMALES}"
     encoded_path = quote(full_path, safe='/')
     url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_path}:/content"
 
@@ -30,19 +33,21 @@ def get_all_normales(folder_path, filename, access_token):
             df = df[df["DEPARTAMENTO"] == "PUNO"]
             df = df.drop("DEPARTAMENTO", axis=1)
             df = df.set_index('NOMBRE ESTACION', drop=True)
+            df.columns = df.columns.str.upper()
             normales[sheet] = df
 
         return normales
     else:
-        raise Exception(f"Fallo al descargar {filename}: {response.status_code}")
+        raise Exception(f"Fallo al descargar {cf.ARCHIVO_EXCEL_NORMALES}: {response.status_code}")
 
-def get_registro_diario(folder_path, year, month, day, access_token):
+def get_registro_diario(year, month, day):
     """
     Obtener un Dataframe de variables registradas por estación diario
     """
 
-    headers = {"Authorization" : f"Bearer {access_token}"}
-    month = convert_month(month - 1)
+    headers = {"Authorization" : f"Bearer {data_cache["ACCESS_TOKEN"]}"}
+    folder_path = f"{cf.DIRECTORIO_PRINCIPAL}/{cf.DIRECTORIO_REGISTRO_DIARIO}"
+    month = convert_month(month)
     if day < 10:
         day = digit_to_string(day - 1)
 
@@ -69,20 +74,24 @@ def get_registro_diario(folder_path, year, month, day, access_token):
     else:
         raise Exception(f"Fallo al descargar el registro diario: {response.status_code}")
 
-def get_registro_mensual(folder_path, year, month, access_token):
+def get_registro_mensual(year, month):
     """
     Obtener un Dataframe de los datos mensuales de todas las estaciones
     """
 
-    name_month = convert_month(month - 1)
-    if month < 10:
-        month = digit_to_string(month - 1)
+    headers = {"Authorization" : f"Bearer {data_cache["ACCESS_TOKEN"]}"}
+    folder_path = f"{cf.DIRECTORIO_PRINCIPAL}/{cf.DIRECTORIO_REGISTRO_SEMANAL}"
 
-    full_path = f"{folder_path}/{year}/{month}. {name_month} {year}.xlsx"
+    name_month = convert_month(month)
+    if month < 10:
+        num_month = digit_to_string(month)
+    else:
+        num_month = month
+
+    full_path = f"{folder_path}/{year}/{num_month}. {name_month} {year}.xlsx"
     encoded_path = quote(full_path, safe='/')
     url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_path}:/content"
 
-    headers = {"Authorization" : f"Bearer {access_token}"}
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
@@ -92,7 +101,7 @@ def get_registro_mensual(folder_path, year, month, access_token):
             sheet_name="METEO",
             skiprows=4,
             usecols='B:FU',
-            nrows=33
+            nrows=calendar.monthrange(year, month)[1] + 2
         )
         df.iloc[0] = df.iloc[0].ffill()
         df.columns = pd.MultiIndex.from_arrays([df.iloc[0], df.iloc[1]])
@@ -108,7 +117,7 @@ def convert_month(month):
 
     monts_match = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
         "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
-    return monts_match[month]
+    return monts_match[month - 1]
 
 def digit_to_string(number):
     """
@@ -116,4 +125,4 @@ def digit_to_string(number):
     """
 
     digit_match = ["01", "02", "03", "04", "05", "06", "07", "08", "09"]
-    return digit_match[number]
+    return digit_match[number - 1]

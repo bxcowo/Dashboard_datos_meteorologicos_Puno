@@ -11,3 +11,4 @@ token_cache.json
 
 # Virtual environments
 .venv
+uv.lock
