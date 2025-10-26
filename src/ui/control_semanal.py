@@ -323,63 +323,67 @@ def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
         # Usar las fechas filtradas
         fechas = fechas_filtradas.tolist()
 
-        # Obtener valores normales para las estaciones
-        normales = data_cache.get('NORMALES', {})
-
+        # Obtener valores normales para las estaciones (usando la misma lógica que control_diario.py)
         def get_normal_values(estacion, fechas_list):
-            """Obtiene los valores normales para una estación en el rango de fechas"""
+            """Obtiene los valores normales para una estación en el rango de fechas
+            Retorna valores constantes por mes (líneas escalonadas)
+            """
+            from data.file_managment import convert_month
+
             tmax_normal = []
             tmin_normal = []
             pp_normal = []
 
-            estacion_norm = normalize_station_name(estacion)
+            # Obtener DataFrames de normales del cache
+            df_tmax_normal = data_cache.get('NORMAL_TMAX')
+            df_tmin_normal = data_cache.get('NORMAL_TMIN')
+            df_pp_normal = data_cache.get('NORMAL_PP')
 
+            print(f"\n=== Obteniendo normales para {estacion} ===")
+            print(f"NORMAL_TMAX disponible: {df_tmax_normal is not None}")
+            print(f"NORMAL_TMIN disponible: {df_tmin_normal is not None}")
+            print(f"NORMAL_PP disponible: {df_pp_normal is not None}")
+
+            if df_tmax_normal is not None:
+                print(f"Estaciones en TMAX: {df_tmax_normal.index.tolist()[:10]}...")
+
+            # Construir listas con valores constantes por mes
             for fecha in fechas_list:
-                mes = fecha.strftime('%B').upper() if hasattr(fecha, 'strftime') else pd.Timestamp(fecha).strftime('%B').upper()
-                # Convertir nombre de mes en inglés a español
-                meses_esp = {
-                    'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
-                    'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
-                    'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
-                    'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
-                }
-                mes_esp = meses_esp.get(mes, mes)
+                fecha_ts = pd.Timestamp(fecha) if not isinstance(fecha, pd.Timestamp) else fecha
+                mes_num = fecha_ts.month
+                mes_nombre_esp = convert_month(mes_num)  # Usar la función de file_managment
 
-                # Buscar en las normales
+                # TMAX normal
                 try:
-                    if 'TMAX' in normales:
-                        val = None
-                        for idx in normales['TMAX'].index:
-                            if normalize_station_name(idx) == estacion_norm:
-                                val = normales['TMAX'].loc[idx, mes_esp] if mes_esp in normales['TMAX'].columns else None
-                                break
-                        tmax_normal.append(val)
+                    if df_tmax_normal is not None and estacion in df_tmax_normal.index:
+                        val = df_tmax_normal.loc[estacion, mes_nombre_esp]
+                        tmax_normal.append(val if pd.notna(val) else None)
                     else:
                         tmax_normal.append(None)
+                except:
+                    tmax_normal.append(None)
 
-                    if 'TMIN' in normales:
-                        val = None
-                        for idx in normales['TMIN'].index:
-                            if normalize_station_name(idx) == estacion_norm:
-                                val = normales['TMIN'].loc[idx, mes_esp] if mes_esp in normales['TMIN'].columns else None
-                                break
-                        tmin_normal.append(val)
+                # TMIN normal
+                try:
+                    if df_tmin_normal is not None and estacion in df_tmin_normal.index:
+                        val = df_tmin_normal.loc[estacion, mes_nombre_esp]
+                        tmin_normal.append(val if pd.notna(val) else None)
                     else:
                         tmin_normal.append(None)
+                except:
+                    tmin_normal.append(None)
 
-                    if 'PP' in normales:
-                        val = None
-                        for idx in normales['PP'].index:
-                            if normalize_station_name(idx) == estacion_norm:
-                                val = normales['PP'].loc[idx, mes_esp] if mes_esp in normales['PP'].columns else None
-                                break
-                        pp_normal.append(val)
+                # PP normal
+                try:
+                    if df_pp_normal is not None and estacion in df_pp_normal.index:
+                        val = df_pp_normal.loc[estacion, mes_nombre_esp]
+                        pp_normal.append(val if pd.notna(val) else None)
                     else:
                         pp_normal.append(None)
                 except:
-                    tmax_normal.append(None)
-                    tmin_normal.append(None)
                     pp_normal.append(None)
+
+            print(f"Normales encontradas: TMAX={len([x for x in tmax_normal if x is not None])}, TMIN={len([x for x in tmin_normal if x is not None])}, PP={len([x for x in pp_normal if x is not None])}")
 
             return tmax_normal, tmin_normal, pp_normal
 
@@ -401,15 +405,19 @@ def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
             marker=dict(size=4)
         ))
 
-        # Agregar normales para estación 1
+        # Agregar normales para estación 1 (líneas escalonadas por mes)
         fig_temp.add_trace(go.Scatter(
             x=fechas, y=tmax1_normal, mode='lines',
-            name=f'{estacion1} - TMAX Normal', line=dict(color=COLORS['station1']['tmax_normal'], width=2, dash='dash'),
+            name=f'{estacion1} - TMAX Normal (1991-2020)',
+            line=dict(color=COLORS['station1']['tmax_normal'], width=3, dash='dash'),
+            line_shape='hv',  # Línea escalonada
             showlegend=True
         ))
         fig_temp.add_trace(go.Scatter(
             x=fechas, y=tmin1_normal, mode='lines',
-            name=f'{estacion1} - TMIN Normal', line=dict(color=COLORS['station1']['tmin_normal'], width=2, dash='dash'),
+            name=f'{estacion1} - TMIN Normal (1991-2020)',
+            line=dict(color=COLORS['station1']['tmin_normal'], width=3, dash='dash'),
+            line_shape='hv',  # Línea escalonada
             showlegend=True
         ))
 
@@ -431,16 +439,20 @@ def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
                     marker=dict(size=4, symbol='square')
                 ))
 
-                # Normales estación 2
+                # Normales estación 2 (líneas escalonadas por mes)
                 tmax2_normal, tmin2_normal, pp2_normal = get_normal_values(estacion2, fechas)
                 fig_temp.add_trace(go.Scatter(
                     x=fechas, y=tmax2_normal, mode='lines',
-                    name=f'{estacion2} - TMAX Normal', line=dict(color=COLORS['station2']['tmax_normal'], width=2, dash='dashdot'),
+                    name=f'{estacion2} - TMAX Normal (1991-2020)',
+                    line=dict(color=COLORS['station2']['tmax_normal'], width=3, dash='dashdot'),
+                    line_shape='hv',  # Línea escalonada
                     showlegend=True
                 ))
                 fig_temp.add_trace(go.Scatter(
                     x=fechas, y=tmin2_normal, mode='lines',
-                    name=f'{estacion2} - TMIN Normal', line=dict(color=COLORS['station2']['tmin_normal'], width=2, dash='dashdot'),
+                    name=f'{estacion2} - TMIN Normal (1991-2020)',
+                    line=dict(color=COLORS['station2']['tmin_normal'], width=3, dash='dashdot'),
+                    line_shape='hv',  # Línea escalonada
                     showlegend=True
                 ))
 
@@ -462,11 +474,12 @@ def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
             marker=dict(size=6)
         ))
 
-        # Agregar normal PP para estación 1
+        # Agregar normal PP para estación 1 (línea escalonada por mes)
         fig_pp.add_trace(go.Scatter(
             x=fechas, y=pp1_normal, mode='lines',
-            name=f'{estacion1} - PP Normal',
-            line=dict(color=COLORS['station1']['pp_normal'], width=2, dash='dash'),
+            name=f'{estacion1} - PP Normal (1991-2020)',
+            line=dict(color=COLORS['station1']['pp_normal'], width=3, dash='dash'),
+            line_shape='hv',  # Línea escalonada
             showlegend=True
         ))
 
@@ -479,12 +492,13 @@ def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
                 marker=dict(size=6, symbol='square')
             ))
 
-            # Agregar normal PP para estación 2
+            # Agregar normal PP para estación 2 (línea escalonada por mes)
             if pp2_normal:
                 fig_pp.add_trace(go.Scatter(
                     x=fechas, y=pp2_normal, mode='lines',
-                    name=f'{estacion2} - PP Normal',
-                    line=dict(color=COLORS['station2']['pp_normal'], width=2, dash='dashdot'),
+                    name=f'{estacion2} - PP Normal (1991-2020)',
+                    line=dict(color=COLORS['station2']['pp_normal'], width=3, dash='dashdot'),
+                    line_shape='hv',  # Línea escalonada
                     showlegend=True
                 ))
 
