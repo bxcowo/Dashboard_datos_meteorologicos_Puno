@@ -49,7 +49,7 @@ def get_registro_diario(year, month, day):
     folder_path = f"{cf.DIRECTORIO_PRINCIPAL}/{cf.DIRECTORIO_REGISTRO_DIARIO}"
     month = convert_month(month)
     if day < 10:
-        day = digit_to_string(day)
+        day = digit_to_string(day - 1)
 
     full_path = f"{folder_path}/{year}/{month}/SENAMHI_DZ13_Datos_{day}_{month}_{year}.xlsx"
     encoded_path = quote(full_path, safe='/')
