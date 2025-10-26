@@ -6,9 +6,10 @@ from dash import html, dcc, callback, Input, Output, State, no_update
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
-from data.file_managment import get_registro_diario
+from datetime import datetime
+from data.file_managment import get_registro_mensual
 from cache import data_cache
+import pandas as pd
 import calendar
 
 # Colores para las estaciones y variables
@@ -23,22 +24,10 @@ COLORS = {
     }
 }
 
-def create_date_picker(id, label, default_date):
-    """Crea un selector de fecha con label"""
-    return dmc.GridCol(
-        span={"base": 12, "sm": 6, "md": 3},
-        children=dmc.Stack(gap="xs", children=[
-            dmc.Text(label, size="sm", fw=500),
-            dcc.DatePickerSingle(
-                id=id, date=default_date, display_format='DD/MM/YYYY', style={'width': '100%'}
-            )
-        ])
-    )
-
 def create_station_selector(id, label, badge_text, badge_color, stations, value, clearable):
     """Crea un selector de estación con badge"""
     return dmc.GridCol(
-        span={"base": 12, "sm": 6, "md": 3},
+        span={"base": 12, "sm": 6, "md": 4},
         children=dmc.Stack(gap="xs", children=[
             dmc.Group(gap="xs", children=[
                 dmc.Text(label, size="sm", fw=500),
@@ -101,10 +90,10 @@ def control_semanal_layout():
             dmc.Paper(p="md", shadow="sm", radius="md", children=[
                 dmc.Group(justify="space-between", children=[
                     dmc.Stack(gap="xs", children=[
-                        dmc.Title("Análisis Semanal", order=2, c="blue.7"),
-                        dmc.Text("Comparación de Datos Diarios vs Valores Normales (1991-2020)", size="sm", c="dimmed")
+                        dmc.Title("Análisis Mensual", order=2, c="blue.7"),
+                        dmc.Text("Comparación de Datos Mensuales vs Valores Normales (1991-2020)", size="sm", c="dimmed")
                     ]),
-                    dmc.ActionIcon(DashIconify(icon="mdi:calendar-range", width=28), size="xl", variant="light", color="blue")
+                    dmc.ActionIcon(DashIconify(icon="mdi:calendar-month", width=28), size="xl", variant="light", color="blue")
                 ])
             ]),
 
@@ -113,11 +102,24 @@ def control_semanal_layout():
                 dmc.Stack(gap="md", children=[
                     dmc.Group(justify="space-between", children=[
                         dmc.Title("Configuración de Consulta", order=4),
-                        dmc.Badge("Datos Diarios + Normales", color="green", variant="light")
+                        dmc.Badge("Datos Mensuales + Normales", color="green", variant="light")
                     ]),
                     dmc.Grid(gutter="md", children=[
-                        create_date_picker('fecha-inicio-semanal', "Fecha Inicio", datetime(2025, 10, 1).date()),
-                        create_date_picker('fecha-fin-semanal', "Fecha Fin", datetime(2025, 10, 9).date()),
+                        # Date range picker
+                        dmc.GridCol(span={"base": 12, "sm": 6, "md": 4}, children=[
+                            dmc.Stack(gap="xs", children=[
+                                dmc.Text("Rango de Fechas", size="sm", fw=500),
+                                dmc.DatesProvider(
+                                    settings={"locale": "es", "firstDayOfWeek": 1},
+                                    children=dmc.DatePicker(
+                                        id="date-range-semanal",
+                                        type="range",
+                                        value=[datetime(2025, 10, 1).date(), datetime(2025, 10, 31).date()],
+                                        minDate=datetime(2020, 1, 1).date()
+                                    )
+                                )
+                            ])
+                        ]),
                         create_station_selector('estacion-selector-1-semanal', "Estación Principal", "Obligatorio", "red",
                                                stations_list, stations_list[0] if stations_list else None, False),
                         create_station_selector('estacion-selector-2-semanal', "Estación Comparación", "Opcional", "blue",
@@ -132,9 +134,9 @@ def control_semanal_layout():
             ]),
 
             # Gráficos
-            create_graph_paper("🌡️ Temperaturas (Máxima y Mínima)", "Datos Diarios + Normales",
+            create_graph_paper("🌡️ Temperaturas (Máxima y Mínima)", "Datos Mensuales + Normales",
                               "orange", "temperatura-graph-semanal", '500px'),
-            create_graph_paper("💧 Precipitación", "Datos Diarios + Normales",
+            create_graph_paper("💧 Precipitación", "Datos Mensuales + Normales",
                               "teal", "precipitacion-graph-semanal", '400px'),
 
             # Estadísticas
@@ -152,10 +154,10 @@ def control_semanal_layout():
     [Output('temperatura-graph-semanal', 'figure'), Output('precipitacion-graph-semanal', 'figure'),
      Output('estadisticas-container-semanal', 'children'), Output('loading-status-semanal', 'children')],
     [Input('cargar-datos-btn-semanal', 'n_clicks')],
-    [State('fecha-inicio-semanal', 'date'), State('fecha-fin-semanal', 'date'),
+    [State('date-range-semanal', 'value'),
      State('estacion-selector-1-semanal', 'value'), State('estacion-selector-2-semanal', 'value')]
 )
-def update_graphs_semanal(n_clicks, fecha_inicio, fecha_fin, estacion1, estacion2):
+def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
     # Obtener normales desde el cache
     normales_dict = {
         'TMAX': data_cache.get("NORMAL_TMAX").to_dict('index') if data_cache.get("NORMAL_TMAX") is not None else {},
@@ -164,16 +166,24 @@ def update_graphs_semanal(n_clicks, fecha_inicio, fecha_fin, estacion1, estacion
     }
 
     # Validación inicial
-    if not n_clicks or not fecha_inicio or not fecha_fin or not estacion1:
-        empty_fig = lambda title: go.Figure(layout=dict(
+    if not n_clicks or not date_range or not estacion1 or not isinstance(date_range, list) or len(date_range) != 2:
+        empty_fig = go.Figure(layout=dict(
             title="Selecciona un rango de fechas y presiona 'Cargar Datos'",
             template='plotly_white'
         ))
-        return empty_fig(""), empty_fig(""), dmc.Text("No hay datos cargados", c="dimmed"), None
+        return empty_fig, empty_fig, dmc.Text("No hay datos cargados", c="dimmed"), None
 
     try:
-        start_date = datetime.fromisoformat(fecha_inicio)
-        end_date = datetime.fromisoformat(fecha_fin)
+        # Manejar diferentes formatos de fecha
+        if isinstance(date_range[0], str):
+            start_date = datetime.fromisoformat(date_range[0])
+        else:
+            start_date = datetime.combine(date_range[0], datetime.min.time())
+
+        if isinstance(date_range[1], str):
+            end_date = datetime.fromisoformat(date_range[1])
+        else:
+            end_date = datetime.combine(date_range[1], datetime.min.time())
 
         # Validaciones
         if start_date > end_date:
@@ -187,130 +197,302 @@ def update_graphs_semanal(n_clicks, fecha_inicio, fecha_fin, estacion1, estacion
                 icon=DashIconify(icon="mdi:alert")
             )
 
-        # Generar lista de fechas
-        date_list = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+        # Calcular los meses necesarios en el rango
+        months_to_load = []
+        current = start_date.replace(day=1)
+        while current <= end_date:
+            months_to_load.append((current.year, current.month))
+            # Ir al siguiente mes
+            if current.month == 12:
+                current = current.replace(year=current.year + 1, month=1)
+            else:
+                current = current.replace(month=current.month + 1)
 
-        # Función para cargar datos de una estación
-        def load_station_data(estacion):
-            fechas, tmax_values, tmin_values, pp_values = [], [], [], []
-            for date in date_list:
-                try:
-                    df_dia = get_registro_diario(date.year, date.month, date.day)
-                    if estacion in df_dia.index.get_level_values('ESTACION'):
-                        row = df_dia.xs(estacion, level='ESTACION').iloc[0]
-                        fechas.append(date)
-                        tmax_values.append(row['TMAX'])
-                        tmin_values.append(row['TMIN'])
-                        pp_values.append(row['PP'])
-                except:
-                    continue
-            return fechas, tmax_values, tmin_values, pp_values
+        # Cargar datos de todos los meses necesarios
+        all_data = []
+        all_fechas = []
 
-        # Cargar datos estación 1
-        fechas1, tmax1, tmin1, pp1 = load_station_data(estacion1)
-        if not fechas1:
+        for year, month in months_to_load:
+            try:
+                df_mes = get_registro_mensual(year, month)
+                # Generar fechas para cada día del mes
+                days_in_month = len(df_mes)
+                fechas_mes = pd.date_range(start=f"{year}-{month:02d}-01", periods=days_in_month, freq='D')
+
+                all_data.append(df_mes)
+                all_fechas.extend(fechas_mes.tolist())
+            except Exception as e:
+                return no_update, no_update, no_update, dmc.Alert(
+                    f"Error al cargar datos del mes {month}/{year}: {str(e)}", color="red",
+                    icon=DashIconify(icon="mdi:alert")
+                )
+
+        # Combinar todos los dataframes manteniendo el MultiIndex en columnas
+        df_combined = pd.concat(all_data, ignore_index=True)
+
+        # Agregar las fechas como una serie separada (no como parte del MultiIndex)
+        fechas_series = pd.Series(all_fechas, name='fecha')
+
+        # Filtrar por el rango de fechas exacto
+        mask = (fechas_series >= start_date) & (fechas_series <= end_date)
+        df_filtrado = df_combined[mask].copy()
+        fechas_filtradas = fechas_series[mask].reset_index(drop=True)
+
+        if len(df_filtrado) == 0:
             return no_update, no_update, no_update, dmc.Alert(
-                f"No se encontraron datos para la estación {estacion1} en el rango seleccionado",
-                color="yellow", icon=DashIconify(icon="mdi:alert")
+                "No se encontraron datos en el rango seleccionado", color="yellow",
+                icon=DashIconify(icon="mdi:alert")
             )
 
-        # Preparar normales estación 1
-        normales_est1 = {
-            var: list(normales_dict[var][estacion1].values()) if estacion1 in normales_dict[var] else None
-            for var in ['TMAX', 'TMIN', 'PP']
-        }
+        df_filtrado = df_filtrado.reset_index(drop=True)
 
-        # Función para agregar trazas diarias
-        def add_daily_traces(fig, fechas, tmax, tmin, pp, estacion, station_key, is_temp_graph):
-            traces_config = [
-                ('TMAX', tmax, 'tmax', '°C') if is_temp_graph else ('PP', pp, 'pp', 'mm'),
-                ('TMIN', tmin, 'tmin', '°C') if is_temp_graph else None
-            ]
-            for config in filter(None, traces_config):
-                var_name, values, color_key, unit = config
-                fig.add_trace(go.Scatter(
-                    x=fechas, y=values, mode='lines+markers',
-                    name=f'{estacion} - {var_name} (Diaria)',
-                    line=dict(color=COLORS[station_key][color_key], width=1.5,
-                             dash='dot' if station_key == 'station2' else None),
-                    marker=dict(size=3, symbol='square' if station_key == 'station2' else 'circle'),
-                    hovertemplate=f'<b>{estacion} - {var_name} Diaria</b><br>Fecha: %{{x|%d/%m/%Y}}<br>Valor: %{{y:.1f}}{unit}<extra></extra>'
-                ))
+        # Función para normalizar nombres de estaciones (igual que en file_managment.py)
+        def normalize_station_name(name):
+            """Normaliza el nombre de estación: quita acentos, mayúsculas, trim"""
+            normalized = str(name).upper().strip()
+            # Quitar acentos
+            normalized = normalized.translate(str.maketrans('ÁÉÍÓÚ', 'AEIOU'))
+            # Caso especial
+            if "TAHUACO - YUNGUYO" in normalized:
+                normalized = "TAHUACO YUNGUYO"
+            return normalized
 
-        # Función para agregar líneas normales por mes
-        def add_normal_lines(fig, estacion, station_key, var_configs):
-            months_in_range = sorted(set(d.month for d in date_list))
-            for month_idx, month in enumerate(months_in_range):
-                year = start_date.year if start_date.month <= month <= end_date.month else end_date.year
-                first_day = max(datetime(year, month, 1), start_date)
-                last_day = min(datetime(year, month, calendar.monthrange(year, month)[1]), end_date)
+        # Función para extraer datos de una estación
+        def extract_station_data(df, estacion):
+            try:
+                # El DataFrame tiene MultiIndex en columnas: (estacion, variable)
+                # Normalizar nombre de estación para búsqueda
+                estacion_norm = normalize_station_name(estacion)
 
-                for var_name, color_key, unit, normal_values in var_configs:
-                    if normal_values is None:
-                        continue
-                    value = normal_values[month - 1]
-                    fig.add_trace(go.Scatter(
-                        x=[first_day, last_day], y=[value, value], mode='lines',
-                        name=f'{estacion} - {var_name} Normal (1991-2020)',
-                        line=dict(color=COLORS[station_key][color_key], width=4),
-                        hovertemplate=f'<b>{estacion} - {var_name} Normal</b><br>Mes: {calendar.month_name[month]}<br>Valor: {value:.1f}{unit}<extra></extra>',
-                        legendgroup=f'{var_name.lower()}_normal_{station_key[-1]}',
-                        showlegend=(month_idx == 0)
-                    ))
+                # Buscar en el MultiIndex
+                tmax_data = None
+                tmin_data = None
+                pp_data = None
+
+                # Imprimir columnas disponibles para debug
+                print(f"Buscando estación: {estacion_norm}")
+                print(f"Columnas MultiIndex disponibles: {[col for col in df.columns if isinstance(col, tuple)][:5]}...")
+
+                for col in df.columns:
+                    if isinstance(col, tuple) and len(col) == 2:
+                        estacion_col, variable_col = col
+                        estacion_col_norm = normalize_station_name(estacion_col)
+
+                        # Verificar si la estación coincide
+                        if estacion_norm == estacion_col_norm or estacion_norm in estacion_col_norm:
+                            var_str = str(variable_col).upper().strip()
+                            # Buscar TMAX o MAX
+                            if 'MAX' in var_str:
+                                tmax_data = pd.to_numeric(df[col], errors='coerce')
+                                print(f"  ✓ Encontrado TMAX en columna: {col}")
+                            # Buscar TMIN o MIN
+                            elif 'MIN' in var_str:
+                                tmin_data = pd.to_numeric(df[col], errors='coerce')
+                                print(f"  ✓ Encontrado TMIN en columna: {col}")
+                            # Buscar PP o PREC
+                            elif 'PP' in var_str or 'PREC' in var_str:
+                                pp_data = pd.to_numeric(df[col], errors='coerce')
+                                print(f"  ✓ Encontrado PP en columna: {col}")
+
+                if tmax_data is None or tmin_data is None or pp_data is None:
+                    print(f"  ✗ Datos incompletos para {estacion}: TMAX={tmax_data is not None}, TMIN={tmin_data is not None}, PP={pp_data is not None}")
+                    return None, None, None
+
+                # Convertir a listas, manteniendo NaN para alineación con fechas
+                # Plotly maneja automáticamente los valores NaN
+                tmax = tmax_data.tolist()
+                tmin = tmin_data.tolist()
+                pp = pp_data.tolist()
+
+                return tmax, tmin, pp
+            except Exception as e:
+                print(f"Error extrayendo datos para {estacion}: {e}")
+                import traceback
+                traceback.print_exc()
+                return None, None, None
+
+        # Extraer datos estación 1
+        tmax1, tmin1, pp1 = extract_station_data(df_filtrado, estacion1)
+
+        if not tmax1 or not tmin1 or not pp1:
+            return no_update, no_update, no_update, dmc.Alert(
+                f"No se encontraron datos para la estación {estacion1} en el rango seleccionado", color="yellow",
+                icon=DashIconify(icon="mdi:alert")
+            )
+
+        # Usar las fechas filtradas
+        fechas = fechas_filtradas.tolist()
+
+        # Obtener valores normales para las estaciones
+        normales = data_cache.get('NORMALES', {})
+
+        def get_normal_values(estacion, fechas_list):
+            """Obtiene los valores normales para una estación en el rango de fechas"""
+            tmax_normal = []
+            tmin_normal = []
+            pp_normal = []
+
+            estacion_norm = normalize_station_name(estacion)
+
+            for fecha in fechas_list:
+                mes = fecha.strftime('%B').upper() if hasattr(fecha, 'strftime') else pd.Timestamp(fecha).strftime('%B').upper()
+                # Convertir nombre de mes en inglés a español
+                meses_esp = {
+                    'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+                    'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+                    'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+                    'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+                }
+                mes_esp = meses_esp.get(mes, mes)
+
+                # Buscar en las normales
+                try:
+                    if 'TMAX' in normales:
+                        val = None
+                        for idx in normales['TMAX'].index:
+                            if normalize_station_name(idx) == estacion_norm:
+                                val = normales['TMAX'].loc[idx, mes_esp] if mes_esp in normales['TMAX'].columns else None
+                                break
+                        tmax_normal.append(val)
+                    else:
+                        tmax_normal.append(None)
+
+                    if 'TMIN' in normales:
+                        val = None
+                        for idx in normales['TMIN'].index:
+                            if normalize_station_name(idx) == estacion_norm:
+                                val = normales['TMIN'].loc[idx, mes_esp] if mes_esp in normales['TMIN'].columns else None
+                                break
+                        tmin_normal.append(val)
+                    else:
+                        tmin_normal.append(None)
+
+                    if 'PP' in normales:
+                        val = None
+                        for idx in normales['PP'].index:
+                            if normalize_station_name(idx) == estacion_norm:
+                                val = normales['PP'].loc[idx, mes_esp] if mes_esp in normales['PP'].columns else None
+                                break
+                        pp_normal.append(val)
+                    else:
+                        pp_normal.append(None)
+                except:
+                    tmax_normal.append(None)
+                    tmin_normal.append(None)
+                    pp_normal.append(None)
+
+            return tmax_normal, tmin_normal, pp_normal
+
+        # Obtener normales para estación 1
+        tmax1_normal, tmin1_normal, pp1_normal = get_normal_values(estacion1, fechas)
 
         # GRÁFICO DE TEMPERATURAS
         fig_temp = go.Figure()
-        add_daily_traces(fig_temp, fechas1, tmax1, tmin1, pp1, estacion1, 'station1', True)
-        add_normal_lines(fig_temp, estacion1, 'station1', [
-            ('TMAX', 'tmax_normal', '°C', normales_est1['TMAX']),
-            ('TMIN', 'tmin_normal', '°C', normales_est1['TMIN'])
-        ])
+
+        # Estación 1 - TMAX y TMIN
+        fig_temp.add_trace(go.Scatter(
+            x=fechas, y=tmax1, mode='lines+markers',
+            name=f'{estacion1} - TMAX', line=dict(color=COLORS['station1']['tmax'], width=2),
+            marker=dict(size=4)
+        ))
+        fig_temp.add_trace(go.Scatter(
+            x=fechas, y=tmin1, mode='lines+markers',
+            name=f'{estacion1} - TMIN', line=dict(color=COLORS['station1']['tmin'], width=2),
+            marker=dict(size=4)
+        ))
+
+        # Agregar normales para estación 1
+        fig_temp.add_trace(go.Scatter(
+            x=fechas, y=tmax1_normal, mode='lines',
+            name=f'{estacion1} - TMAX Normal', line=dict(color=COLORS['station1']['tmax_normal'], width=2, dash='dash'),
+            showlegend=True
+        ))
+        fig_temp.add_trace(go.Scatter(
+            x=fechas, y=tmin1_normal, mode='lines',
+            name=f'{estacion1} - TMIN Normal', line=dict(color=COLORS['station1']['tmin_normal'], width=2, dash='dash'),
+            showlegend=True
+        ))
 
         # Estación 2 si existe
-        fechas2, tmax2, tmin2, pp2 = None, None, None, None
+        tmax2, tmin2, pp2 = None, None, None
+        tmax2_normal, tmin2_normal, pp2_normal = None, None, None
         if estacion2:
-            fechas2, tmax2, tmin2, pp2 = load_station_data(estacion2)
-            if fechas2:
-                add_daily_traces(fig_temp, fechas2, tmax2, tmin2, pp2, estacion2, 'station2', True)
-                normales_est2 = {
-                    var: list(normales_dict[var][estacion2].values()) if estacion2 in normales_dict[var] else None
-                    for var in ['TMAX', 'TMIN']
-                }
-                add_normal_lines(fig_temp, estacion2, 'station2', [
-                    ('TMAX', 'tmax_normal', '°C', normales_est2['TMAX']),
-                    ('TMIN', 'tmin_normal', '°C', normales_est2['TMIN'])
-                ])
+            tmax2, tmin2, pp2 = extract_station_data(df_filtrado, estacion2)
+            if tmax2 and tmin2:
+                # Datos reales
+                fig_temp.add_trace(go.Scatter(
+                    x=fechas, y=tmax2, mode='lines+markers',
+                    name=f'{estacion2} - TMAX', line=dict(color=COLORS['station2']['tmax'], width=2, dash='dot'),
+                    marker=dict(size=4, symbol='square')
+                ))
+                fig_temp.add_trace(go.Scatter(
+                    x=fechas, y=tmin2, mode='lines+markers',
+                    name=f'{estacion2} - TMIN', line=dict(color=COLORS['station2']['tmin'], width=2, dash='dot'),
+                    marker=dict(size=4, symbol='square')
+                ))
+
+                # Normales estación 2
+                tmax2_normal, tmin2_normal, pp2_normal = get_normal_values(estacion2, fechas)
+                fig_temp.add_trace(go.Scatter(
+                    x=fechas, y=tmax2_normal, mode='lines',
+                    name=f'{estacion2} - TMAX Normal', line=dict(color=COLORS['station2']['tmax_normal'], width=2, dash='dashdot'),
+                    showlegend=True
+                ))
+                fig_temp.add_trace(go.Scatter(
+                    x=fechas, y=tmin2_normal, mode='lines',
+                    name=f'{estacion2} - TMIN Normal', line=dict(color=COLORS['station2']['tmin_normal'], width=2, dash='dashdot'),
+                    showlegend=True
+                ))
 
         fig_temp.update_layout(
-            xaxis=dict(title="Fecha", rangeslider=dict(visible=True), type='date',
-                      dtick=86400000, tickformat='%d/%m/%Y'),
+            xaxis=dict(title="Fecha", tickformat='%d/%m/%Y'),
             yaxis=dict(title="Temperatura (°C)"),
             hovermode='x unified', template='plotly_white', height=500,
-            legend=dict(orientation="v", yanchor="top", y=0.99, xanchor="left", x=1.01),
-            dragmode='pan'
+            legend=dict(orientation="v", yanchor="top", y=0.99, xanchor="left", x=1.01)
         )
 
         # GRÁFICO DE PRECIPITACIÓN
         fig_pp = go.Figure()
-        add_daily_traces(fig_pp, fechas1, tmax1, tmin1, pp1, estacion1, 'station1', False)
-        add_normal_lines(fig_pp, estacion1, 'station1', [
-            ('PP', 'pp_normal', 'mm', normales_est1['PP'])
-        ])
 
-        if estacion2 and fechas2:
-            add_daily_traces(fig_pp, fechas2, tmax2, tmin2, pp2, estacion2, 'station2', False)
-            normales_est2_pp = list(normales_dict['PP'][estacion2].values()) if estacion2 in normales_dict['PP'] else None
-            add_normal_lines(fig_pp, estacion2, 'station2', [
-                ('PP', 'pp_normal', 'mm', normales_est2_pp)
-            ])
+        # Estación 1 - PP con puntos
+        fig_pp.add_trace(go.Scatter(
+            x=fechas, y=pp1, mode='lines+markers',
+            name=f'{estacion1} - PP',
+            line=dict(color=COLORS['station1']['pp'], width=2),
+            marker=dict(size=6)
+        ))
+
+        # Agregar normal PP para estación 1
+        fig_pp.add_trace(go.Scatter(
+            x=fechas, y=pp1_normal, mode='lines',
+            name=f'{estacion1} - PP Normal',
+            line=dict(color=COLORS['station1']['pp_normal'], width=2, dash='dash'),
+            showlegend=True
+        ))
+
+        if estacion2 and pp2:
+            # Estación 2 - PP con puntos
+            fig_pp.add_trace(go.Scatter(
+                x=fechas, y=pp2, mode='lines+markers',
+                name=f'{estacion2} - PP',
+                line=dict(color=COLORS['station2']['pp'], width=2, dash='dot'),
+                marker=dict(size=6, symbol='square')
+            ))
+
+            # Agregar normal PP para estación 2
+            if pp2_normal:
+                fig_pp.add_trace(go.Scatter(
+                    x=fechas, y=pp2_normal, mode='lines',
+                    name=f'{estacion2} - PP Normal',
+                    line=dict(color=COLORS['station2']['pp_normal'], width=2, dash='dashdot'),
+                    showlegend=True
+                ))
 
         fig_pp.update_layout(
-            xaxis=dict(title="Fecha", rangeslider=dict(visible=True), type='date',
-                      dtick=86400000, tickformat='%d/%m/%Y'),
+            xaxis=dict(title="Fecha", tickformat='%d/%m/%Y'),
             yaxis=dict(title="Precipitación (mm)"),
             hovermode='x unified', template='plotly_white', height=400,
-            legend=dict(orientation="v", yanchor="top", y=0.99, xanchor="left", x=1.01),
-            dragmode='pan'
+            legend=dict(orientation="v", yanchor="top", y=0.99, xanchor="left", x=1.01)
         )
 
         # ESTADÍSTICAS
@@ -325,7 +507,7 @@ def update_graphs_semanal(n_clicks, fecha_inicio, fecha_fin, estacion1, estacion
             ])
         ]
 
-        if estacion2 and fechas2:
+        if estacion2 and tmax2 and tmin2 and pp2:
             stats_children.append(
                 dmc.Stack(gap="xs", children=[
                     dmc.Title(f"📍 {estacion2}", order=5, c="violet.7"),
@@ -337,8 +519,13 @@ def update_graphs_semanal(n_clicks, fecha_inicio, fecha_fin, estacion1, estacion
                 ])
             )
 
-        status_msg = f"✅ Datos cargados: {len(fechas1)} días"
-        if estacion2 and fechas2:
+        # Mensaje con info de meses cargados
+        num_meses = len(months_to_load)
+        if num_meses == 1:
+            status_msg = f"✅ Datos cargados: {len(fechas)} días del {months_to_load[0][1]}/{months_to_load[0][0]}"
+        else:
+            status_msg = f"✅ Datos cargados: {len(fechas)} días de {num_meses} meses"
+        if estacion2 and tmax2:
             status_msg += f" | Comparando 2 estaciones"
 
         return fig_temp, fig_pp, dmc.Stack(gap="lg", children=stats_children), \
