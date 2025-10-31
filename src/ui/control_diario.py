@@ -103,35 +103,64 @@ def create_graph(n_clicks, variable, fecha):
         estaciones_zona = data_zona.index.to_numpy()
         data_normal_zona = data_normal.reindex(estaciones_zona)
 
-        fig.add_trace(
-            go.Scatter(
-                x=estaciones_zona,
-                y=data_zona,
-                mode='lines+markers',
-                name=f"Registro {fecha_obj.strftime(nuevo_formato_fecha)}",
-                legendgroup="registro",
-                showlegend=(i == 0),
-                line=dict(color=color_registro, width=2),
-                marker=dict(size=8)
-            ),
-            row=(i // 2) + 1,
-            col=(i % 2) + 1
-        )
+        if variable == 'PP':
+            # Use bar plot for precipitation
+            fig.add_trace(
+                go.Bar(
+                    x=estaciones_zona,
+                    y=data_zona,
+                    name=f"Registro {fecha_obj.strftime(nuevo_formato_fecha)}",
+                    legendgroup="registro",
+                    showlegend=(i == 0),
+                    marker=dict(color=color_registro)
+                ),
+                row=(i // 2) + 1,
+                col=(i % 2) + 1
+            )
 
-        fig.add_trace(
-            go.Scatter(
-                x=estaciones_zona,
-                y=data_normal_zona,
-                mode='lines+markers',
-                name=f"Normal histórica ({convert_month(fecha_obj.month)})",
-                legendgroup="normal",
-                showlegend=(i == 0),
-                line=dict(color=color_normal, width=2),
-                marker=dict(size=8)
-            ),
-            row=(i // 2) + 1,
-            col=(i % 2) + 1
-        )
+            fig.add_trace(
+                go.Bar(
+                    x=estaciones_zona,
+                    y=data_normal_zona,
+                    name=f"Normal histórica ({convert_month(fecha_obj.month)})",
+                    legendgroup="normal",
+                    showlegend=(i == 0),
+                    marker=dict(color=color_normal)
+                ),
+                row=(i // 2) + 1,
+                col=(i % 2) + 1
+            )
+        else:
+            # Use line plot for temperature
+            fig.add_trace(
+                go.Scatter(
+                    x=estaciones_zona,
+                    y=data_zona,
+                    mode='lines+markers',
+                    name=f"Registro {fecha_obj.strftime(nuevo_formato_fecha)}",
+                    legendgroup="registro",
+                    showlegend=(i == 0),
+                    line=dict(color=color_registro, width=2),
+                    marker=dict(size=8)
+                ),
+                row=(i // 2) + 1,
+                col=(i % 2) + 1
+            )
+
+            fig.add_trace(
+                go.Scatter(
+                    x=estaciones_zona,
+                    y=data_normal_zona,
+                    mode='lines+markers',
+                    name=f"Normal histórica ({convert_month(fecha_obj.month)})",
+                    legendgroup="normal",
+                    showlegend=(i == 0),
+                    line=dict(color=color_normal, width=2),
+                    marker=dict(size=8)
+                ),
+                row=(i // 2) + 1,
+                col=(i % 2) + 1
+            )
 
     fig.update_layout(
         title={
