@@ -6,6 +6,7 @@ from cache import init_cache
 from config import CLIENT_ID
 from ui.control_diario import registro_diario_layout
 from ui.control_semanal import control_semanal_layout
+from ui.generacion_planilla import generacion_planilla_layout
 
 
 def create_navbar():
@@ -37,7 +38,10 @@ def create_navbar():
                         DashIconify(icon="mdi:calendar-range", width=18),
                         dmc.Text("Análisis Semanal")
                     ])},
-                    {}
+                    {"value": "planilla", "label": dmc.Group(gap="xs", children=[
+                        DashIconify(icon="mdi:file-document-edit", width=18),
+                        dmc.Text("Generar Planilla")
+                    ])}
                 ],
                 size="md",
                 radius="md",
@@ -76,6 +80,8 @@ def display_page(page):
         return registro_diario_layout()
     elif page == "semanal":
         return control_semanal_layout()
+    elif page == "planilla":
+        return generacion_planilla_layout()
     return html.Div("Página no encontrada")
 
 def main():
@@ -102,6 +108,7 @@ def main():
     print("3. Abriendo dashboard en http://127.0.0.1:8050")
     print("   Análisis Diario: Vista por zonas de Puno")
     print("   Análisis Semanal: Comparación entre estaciones")
+    print("   Generar Planilla: Generación de planilla climatológica")
     print("   Presiona Ctrl+C para detener el servidor\n")
 
     app.run(debug=True, host='127.0.0.1', port=8050)
