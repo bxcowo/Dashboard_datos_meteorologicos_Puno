@@ -14,3 +14,4 @@ def init_cache():
     sheets = ["TMAX", "TMIN", "PP"]
     for sheet in sheets:
         data_cache[f"NORMAL_{sheet}"] = resultados_normales[sheet]
+    data_cache["LISTA_ESTACIONES"] = data_cache["NORMAL_TMAX"].index.tolist()
