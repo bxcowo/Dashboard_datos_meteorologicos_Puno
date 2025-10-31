@@ -91,13 +91,10 @@ def get_normal_values(estacion, fechas):
         mes_nombre = convert_month(fecha_ts.month)
 
         for var_name, df_normal in [('TMAX', df_tmax), ('TMIN', df_tmin), ('PP', df_pp)]:
-            try:
-                if df_normal is not None and estacion in df_normal.index:
-                    val = df_normal.loc[estacion, mes_nombre]
-                    result[var_name].append(val if pd.notna(val) else None)
-                else:
-                    result[var_name].append(None)
-            except:
+            if df_normal is not None and estacion in df_normal.index:
+                val = df_normal.loc[estacion, mes_nombre]
+                result[var_name].append(val if pd.notna(val) else None)
+            else:
                 result[var_name].append(None)
 
     return result
