@@ -1,5 +1,6 @@
 from data.file_managment import get_registro_diario, convert_month
-from dash import Output, Input, callback, dcc
+from dash import Output, Input, State, callback, dcc, html
+from dash_iconify import DashIconify
 from plotly.subplots import make_subplots
 from datetime import date, datetime
 from cache import data_cache
@@ -15,50 +16,62 @@ DICCIONARIO_VARIABLES = {
 def registro_diario_layout():
     content = dmc.MantineProvider([
         dmc.Container([
-            dmc.SimpleGrid(
-                children=[
-                    dmc.Select(
-                        id="variable-selector",
-                        label="Selecciona la variable a representar",
-                        value="TMAX",
-                        data=[
-                            {"value" : "TMAX", "label" : "Temperatura máxima"},
-                            {"value" : "TMIN", "label" : "Temperatura mínima"},
-                            {"value" : "PP", "label" : "Precipitación"},
+            dmc.Paper(p="md", shadow="sm", radius="md", withBorder=True, children=[
+                dmc.Stack(gap="md", children=[
+                    dmc.SimpleGrid(
+                        children=[
+                            dmc.Select(
+                                id="variable-selector",
+                                label="Selecciona la variable a representar",
+                                value="TMAX",
+                                data=[
+                                    {"value" : "TMAX", "label" : "Temperatura máxima"},
+                                    {"value" : "TMIN", "label" : "Temperatura mínima"},
+                                    {"value" : "PP", "label" : "Precipitación"},
+                                ],
+                                size="lg",
+                                w=400
+                            ),
+                            dmc.DatePickerInput(
+                                id="registro-diario-date-selector",
+                                label="Selecciona una fecha a analizar",
+                                minDate=date(1985, 1, 1),
+                                value=None,
+                                size="lg",
+                                w=400
+                            )
                         ],
-                        size="lg",
-                        w=400,
-                        mb=10
+                        cols=2,
+                        spacing="md"
                     ),
-                    dmc.DatePickerInput(
-                        id="registro-diario-date-selector",
-                        label="Selecciona una fecha a analizar",
-                        minDate=date(1985, 1, 1),
-                        value=date(2025, 10, 22),
-                        size="lg",
-                        w=400,
-                        mb=10
-                    )
-                ],
-                cols=2,
-                spacing="md"
-            )
+                    dmc.Group(justify="flex-end", children=[
+                        dmc.Button("Cargar Datos", id='cargar-datos-btn-diario',
+                                  leftSection=DashIconify(icon="mdi:refresh", width=20), size="md", variant="filled")
+                    ]),
+                    html.Div(id='loading-status-diario')
+                ])
+            ]),
         ],
         strategy="grid",
         fluid=True),
         dcc.Graph(id="registro-diario-graph")
-    ],
-    theme=dmc.DEFAULT_THEME)
+    ])
 
     return content
 
 
 @callback(
-    Output('registro-diario-graph', 'figure'),
-    Input('variable-selector', 'value'),
-    Input('registro-diario-date-selector', 'value')
+    [Output('registro-diario-graph', 'figure'), Output('loading-status-diario', 'children')],
+    [Input('cargar-datos-btn-diario', 'n_clicks')],
+    [State('variable-selector', 'value'), State('registro-diario-date-selector', 'value')]
 )
-def create_graph(variable, fecha):
+def create_graph(n_clicks, variable, fecha):
+    if not n_clicks or not fecha:
+        empty_fig = go.Figure(layout=dict(
+            title="Selecciona una fecha y presiona 'Cargar Datos'",
+            template='plotly_white'
+        ))
+        return empty_fig, None
     formato_fecha = "%Y-%m-%d"
     nuevo_formato_fecha = "%d/%m/%Y"
     fecha_obj = datetime.strptime(fecha, formato_fecha)
@@ -71,7 +84,6 @@ def create_graph(variable, fecha):
             day=fecha_obj.day,
         )
 
-    # Extraemos los datos esenciales
     data_registro_diario = data_cache[fecha]
     data_normal = data_cache[f"NORMAL_{variable}"][convert_month(fecha_obj.month)]
 
@@ -92,26 +104,30 @@ def create_graph(variable, fecha):
         data_normal_zona = data_normal.reindex(estaciones_zona)
 
         fig.add_trace(
-            go.Bar(
+            go.Scatter(
                 x=estaciones_zona,
                 y=data_zona,
+                mode='lines+markers',
                 name=f"Registro {fecha_obj.strftime(nuevo_formato_fecha)}",
                 legendgroup="registro",
                 showlegend=(i == 0),
-                marker_color=color_registro
+                line=dict(color=color_registro, width=2),
+                marker=dict(size=8)
             ),
             row=(i // 2) + 1,
             col=(i % 2) + 1
         )
 
         fig.add_trace(
-            go.Bar(
+            go.Scatter(
                 x=estaciones_zona,
                 y=data_normal_zona,
+                mode='lines+markers',
                 name=f"Normal histórica ({convert_month(fecha_obj.month)})",
                 legendgroup="normal",
                 showlegend=(i == 0),
-                marker_color=color_normal
+                line=dict(color=color_normal, width=2),
+                marker=dict(size=8)
             ),
             row=(i // 2) + 1,
             col=(i % 2) + 1
@@ -146,8 +162,11 @@ def create_graph(variable, fecha):
     fig.update_yaxes(
         showgrid=True,
         gridwidth=1,
-        dtick=1,
         gridcolor='lightgray'
     )
 
-    return fig
+    return fig, dmc.Alert(
+        f"Datos cargados para {fecha_obj.strftime(nuevo_formato_fecha)}",
+        color="green",
+        icon=DashIconify(icon="mdi:check-circle")
+    )
