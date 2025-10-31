@@ -314,6 +314,6 @@ def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
     else:
         status_msg = f" Datos cargados: {len(fechas_filtradas)} días de {num_meses} meses"
     if estacion2 and data2:
-        status_msg += f" | Comparando 2 estaciones"
+        status_msg += " | Comparando 2 estaciones"
 
     return fig_temp, fig_pp, dmc.Alert(status_msg, color="green", icon=DashIconify(icon="mdi:check-circle"))
