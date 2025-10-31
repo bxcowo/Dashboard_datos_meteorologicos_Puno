@@ -1,10 +1,12 @@
-from dash import Dash, html, Input, Output, callback
+import dash_mantine_components as dmc
+from dash import Dash, Input, Output, callback, html
+from dash_iconify import DashIconify
+
+from cache import init_cache
+from config import CLIENT_ID
 from ui.control_diario import registro_diario_layout
 from ui.control_semanal import control_semanal_layout
-from dash_iconify import DashIconify
-from config import CLIENT_ID
-from cache import init_cache
-import dash_mantine_components as dmc
+
 
 def create_navbar():
     """
@@ -19,14 +21,14 @@ def create_navbar():
                     size="xl", variant="light", color="blue", radius="xl"
                 ),
                 dmc.Stack(gap=0, children=[
-                    dmc.Title("Dashboard Meteorológico - Puno", order=3, c="blue.7"),
+                    dmc.Title("Dashboard Meteorológico - Puno", order=3, c="blue"),
                     dmc.Text("SENAMHI - Datos Históricos", size="sm", c="dimmed")
                 ])
             ]),
             dmc.SegmentedControl(
                 id="page-selector",
                 value="diario",
-                data=[
+                data=[  # type: ignore[arg-type]
                     {"value": "diario", "label": dmc.Group(gap="xs", children=[
                         DashIconify(icon="mdi:calendar-today", width=18),
                         dmc.Text("Análisis Diario")
@@ -34,7 +36,8 @@ def create_navbar():
                     {"value": "semanal", "label": dmc.Group(gap="xs", children=[
                         DashIconify(icon="mdi:calendar-range", width=18),
                         dmc.Text("Análisis Semanal")
-                    ])}
+                    ])},
+                    {}
                 ],
                 size="md",
                 radius="md",
@@ -61,20 +64,19 @@ def create_multi_page_app():
         ]
     )
 
-    # Callback para cambiar entre páginas
-    @callback(
-        Output("page-content", "children"),
-        Input("page-selector", "value")
-    )
-    def display_page(page):
-        if page == "diario":
-            return registro_diario_layout()
-        elif page == "semanal":
-            return control_semanal_layout()
-        return html.Div("Página no encontrada")
-
     return app
 
+# Callback para cambiar entre páginas
+@callback(
+    Output("page-content", "children"),
+    Input("page-selector", "value")
+)
+def display_page(page):
+    if page == "diario":
+        return registro_diario_layout()
+    elif page == "semanal":
+        return control_semanal_layout()
+    return html.Div("Página no encontrada")
 
 def main():
     """
