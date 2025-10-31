@@ -49,7 +49,7 @@ def get_registro_diario(year, month, day):
     folder_path = f"{cf.DIRECTORIO_PRINCIPAL}/{cf.DIRECTORIO_REGISTRO_DIARIO}"
     month = convert_month(month)
     if day < 10:
-        day = digit_to_string(day - 1)
+        day = digit_to_string(day)
 
     full_path = f"{folder_path}/{year}/{month}/SENAMHI_DZ13_Datos_{day}_{month}_{year}.xlsx"
     encoded_path = quote(full_path, safe='/')
@@ -60,7 +60,7 @@ def get_registro_diario(year, month, day):
         content = BytesIO(response.content)
         df = pd.read_excel(
             content,
-            usecols='A,C:F',
+            usecols='A,C:E,I',
             nrows=42,
             header=3
         )
@@ -109,6 +109,36 @@ def get_registro_mensual(year, month):
         return df
     else:
         raise Exception(f"Fallo al descargar el registro diario: {response.status_code}")
+
+def get_planilla_climatologica(station_name, year, month):
+    """
+    Obtener Dataframe de los datos Voz y Data de una estación para planilla
+
+    Nota: Falta implantar year en los archivos, se mantiene por ahora para demo.
+    """
+
+    headers = {"Authorization" : f"Bearer {data_cache["ACCESS_TOKEN"]}"}
+    folder_path = f"{cf.DIRECTORIO_PRINCIPAL}/{cf.DIRECTORIO_PLANILLA}/{year}/{station_name}"
+
+    month_name = convert_month(month)
+    file_name = f"{month_name}.xlsx"
+    full_path = f"{folder_path}/{file_name}"
+    encoded_path = quote(full_path, safe='/')
+    url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_path}:/content"
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        content = BytesIO(response.content)
+        df = pd.read_excel(
+            content,
+            sheet_name=station_name,
+            usecols='A:U',
+            nrows=91
+        )
+        return df
+    else:
+        raise Exception(f"Fallo al descargar planilla climatológica: {response.status_code}")
 
 def convert_month(month):
     """
