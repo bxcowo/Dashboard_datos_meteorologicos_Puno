@@ -110,6 +110,37 @@ def get_registro_mensual(year, month):
     else:
         raise Exception(f"Fallo al descargar el registro diario: {response.status_code}")
 
+def get_metadata():
+    """
+    Obtener metadata en forma de Dataframe para los archivos excel
+    """
+
+    headers = {"Authorization" : f"Bearer {data_cache["ACCESS_TOKEN"]}"}
+
+    full_path = f"{cf.DIRECTORIO_PRINCIPAL}/{cf.DIRECTORIO_METADATA}/{cf.ARCHIVO_EXCEL_METADATA}"
+    encoded_path = quote(full_path, safe='/')
+    url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{encoded_path}:/content"
+
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        content = BytesIO(response.content)
+        df = pd.read_excel(
+            content,
+            sheet_name="GEOGRAFICAS",
+            usecols='A:G',
+            header=0,
+            nrows=42
+        )
+        df["ESTACION"] = df["ESTACION"].str.translate(str.maketrans('áéíóú', 'aeiou'))
+        df["ESTACION"] = df["ESTACION"].str.upper()
+        df["ESTACION"] = df["ESTACION"].str.replace("TAHUACO - YUNGUYO", "TAHUACO YUNGUYO")
+        df = df.set_index('ESTACION', drop=True)
+
+        return df
+    else:
+        raise Exception(f"Fallo al descargar {cf.ARCHIVO_EXCEL_METADATA}: {response.status_code}")
+
 def get_planilla_climatologica(station_name, year, month):
     """
     Obtener Dataframe de los datos Voz y Data de una estación para planilla
