@@ -100,6 +100,44 @@ def get_normal_values(estacion, fechas):
     return result
 
 
+def make_precipitation_cumulative(pp_values, fechas):
+    """
+    Convierte valores de precipitación a acumulativo por mes.
+    Resetea el acumulado al inicio de cada mes.
+
+    Args:
+        pp_values: Lista de valores de precipitación
+        fechas: Lista de fechas correspondientes
+
+    Returns:
+        Lista de valores acumulativos por mes
+    """
+    if not pp_values or not fechas or len(pp_values) != len(fechas):
+        return pp_values
+
+    cumulative = []
+    current_month = None
+    month_sum = 0
+
+    for i, fecha in enumerate(fechas):
+        fecha_ts = pd.Timestamp(fecha) if not isinstance(fecha, pd.Timestamp) else fecha
+        month_key = (fecha_ts.year, fecha_ts.month)
+
+        # Si cambiamos de mes, reiniciar el acumulado
+        if current_month != month_key:
+            current_month = month_key
+            month_sum = 0
+
+        # Acumular valor actual
+        val = pp_values[i]
+        if pd.notna(val) and val is not None:
+            month_sum += val
+
+        cumulative.append(month_sum if month_sum > 0 else None)
+
+    return cumulative
+
+
 def add_graph_traces(fig, fechas, data_real, data_normal, estacion, color_key, var_names):
     """
     Agrega trazas de datos reales y normales al gráfico
@@ -278,18 +316,27 @@ def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
 
     normal1 = get_normal_values(estacion1, fechas_filtradas)
 
+    # Convert precipitation to cumulative per month
+    data1_pp_cumulative = data1.copy()
+    data1_pp_cumulative['PP'] = make_precipitation_cumulative(data1['PP'], fechas_filtradas)
+
     fig_temp = go.Figure()
     fig_pp = go.Figure()
 
     add_graph_traces(fig_temp, fechas_filtradas, data1, normal1, estacion1, 'station1', ['TMAX', 'TMIN'])
-    add_graph_traces(fig_pp, fechas_filtradas, data1, normal1, estacion1, 'station1', ['PP'])
+    add_graph_traces(fig_pp, fechas_filtradas, data1_pp_cumulative, normal1, estacion1, 'station1', ['PP'])
 
     if estacion2:
         data2 = extract_station_data(df_filtrado, estacion2)
         if data2:
             normal2 = get_normal_values(estacion2, fechas_filtradas)
+
+            # Convert precipitation to cumulative per month for station 2
+            data2_pp_cumulative = data2.copy()
+            data2_pp_cumulative['PP'] = make_precipitation_cumulative(data2['PP'], fechas_filtradas)
+
             add_graph_traces(fig_temp, fechas_filtradas, data2, normal2, estacion2, 'station2', ['TMAX', 'TMIN'])
-            add_graph_traces(fig_pp, fechas_filtradas, data2, normal2, estacion2, 'station2', ['PP'])
+            add_graph_traces(fig_pp, fechas_filtradas, data2_pp_cumulative, normal2, estacion2, 'station2', ['PP'])
 
     fig_temp.update_layout(
         xaxis=dict(title="Fecha", tickformat='%d/%m/%Y'),
@@ -300,7 +347,7 @@ def update_graphs_semanal(n_clicks, date_range, estacion1, estacion2):
 
     fig_pp.update_layout(
         xaxis=dict(title="Fecha", tickformat='%d/%m/%Y'),
-        yaxis=dict(title="Precipitación (mm)"),
+        yaxis=dict(title="Precipitación Acumulada por Mes (mm)"),
         hovermode='x unified', template='plotly_white', height=400,
         legend=dict(orientation="v", yanchor="top", y=0.99, xanchor="left", x=1.01)
     )
